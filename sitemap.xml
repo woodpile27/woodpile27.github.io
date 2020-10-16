@@ -2,6 +2,13 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   
   <url>
+    <loc>http://woodpile27.cn/2020/10/06/hadoop-steaming-note/</loc>
+    
+    <lastmod>2020-10-16</lastmod>
+    
+  </url>
+  
+  <url>
     <loc>http://woodpile27.cn/2020/09/16/docker-monitor/</loc>
     
     <lastmod>2020-09-16</lastmod>
@@ -32,7 +39,7 @@
 
   <url>
     <loc>http://woodpile27.cn/</loc>
-    <lastmod>2020-09-16</lastmod>
+    <lastmod>2020-10-16</lastmod>
     <changefreq>daily</changefreq>
     <priority>1.0</priority>
   </url>
