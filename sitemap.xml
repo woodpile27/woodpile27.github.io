@@ -2,6 +2,13 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   
   <url>
+    <loc>http://woodpile27.cn/2020/12/25/kubernetes-note-1/</loc>
+    
+    <lastmod>2020-12-25</lastmod>
+    
+  </url>
+  
+  <url>
     <loc>http://woodpile27.cn/2020/12/22/use-iptables-to-limit-kubernektes-nodeport-service/</loc>
     
     <lastmod>2020-12-22</lastmod>
@@ -53,7 +60,7 @@
 
   <url>
     <loc>http://woodpile27.cn/</loc>
-    <lastmod>2020-12-22</lastmod>
+    <lastmod>2020-12-25</lastmod>
     <changefreq>daily</changefreq>
     <priority>1.0</priority>
   </url>
