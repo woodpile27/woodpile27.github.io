@@ -1,0 +1,256 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="X-UA-Compatible" content="IE=edge"><title> 深入剖析 Kubernetes 笔记（二） · woodpile27</title><meta name="description" content="深入剖析 Kubernetes 笔记（二） - John Doe"><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="icon" href="/favicon.png"><link rel="stylesheet" href="/css/apollo.css"><link rel="search" type="application/opensearchdescription+xml" href="http://woodpile27.cn/atom.xml" title="woodpile27"><meta name="generator" content="Hexo 5.0.2"><link rel="alternate" href="/atom.xml" title="woodpile27" type="application/atom+xml">
+</head><body><div class="wrap"><header><a href="/" class="logo-link"><img src="/favicon.png" alt="logo"></a><ul class="nav nav-list"><li class="nav-list-item"><a href="/" target="_self" class="nav-list-link">BLOG</a></li><li class="nav-list-item"><a href="/archives/" target="_self" class="nav-list-link">ARCHIVE</a></li><li class="nav-list-item"><a href="https://github.com/woodpile27" target="_blank" class="nav-list-link">GITHUB</a></li><li class="nav-list-item"><a href="/atom.xml" target="_self" class="nav-list-link">RSS</a></li></ul></header><main class="container"><div class="post"><article class="post-block"><h1 class="post-title">深入剖析 Kubernetes 笔记（二）</h1><div class="post-info">Dec 28, 2020</div><div class="post-content"><p><a target="_blank" rel="noopener" href="https://time.geekbang.org/column/intro/116">深入剖析Kubernetes（极客时间）</a></p>
+<h3 id="10-Kubernetes-一键部署利器：kubeadm"><a href="#10-Kubernetes-一键部署利器：kubeadm" class="headerlink" title="10. Kubernetes 一键部署利器：kubeadm"></a>10. Kubernetes 一键部署利器：kubeadm</h3><blockquote>
+<p>kubeadm 的工作原理</p>
+<ul>
+<li>kubelet 是 Kubernetes 项目用来操作 Docker 等容器运行时的核心组件。需要操作宿主机，难以容器化。</li>
+<li>kubeadm 选择把 kubelet 直接运行在宿主机上，然后使用容器部署其他的 Kubernetes 组件。</li>
+<li>所以使用 kubeadm 的第一步，是手动安装 kubeadm、kubelet 和 kubectl 这三个二进制文件。</li>
+</ul>
+<p>kubeadm init 的工作流程</p>
+<ol>
+<li>Preflight Checks，一系列的检查工作，以确定这台机器可以用来部署 Kubernetes。</li>
+<li>生成 Kubernetes 对外提供服务所需的各种证书和对应的目录。/etc/kubernetes/pki/</li>
+<li>为其他组件生成访问 kube-apiserver 所需的配置文件。/etc/kubernetes/xxx.conf</li>
+<li>为 Master 组件生成 Pod 配置文件，包括 apiserver、manager、scheduler。/etc/kubernetes/manifests/</li>
+<li>当配置文件出现在被 kubelet 监视的 /etc/kubernetes/manifests 目录下，kubelet 会自动创建对应的 pod。</li>
+<li>kubeadm 为集群生成一个 bootstrap token。持有 token 的工作节点都可以加入集群。在 token 生成之后，kubeadm 会将 ca.crt 等 Master 节点的重要信息，通过 ConfigMap 的方式保存在 Etcd 当中，供后续部署 Node 节点使用。</li>
+</ol>
+<p>kubeadm join 的工作流程<br>为什么需要 token ？</p>
+<blockquote>
+<p>任何一台机器想要成为 Kubernetes 集群中的一个节点，就必须在集群的 kube-apiserver 上注册。可是，要想跟 apiserver 打交道，这台机器就必须要获取到相应的证书文件（CA 文件）。可是，为了能够一键安装，我们就不能让用户去 Master 节点上手动拷贝这些文件。<br>所以，kubeadm 至少需要发起一次“不安全模式”的访问到 kube-apiserver，从而拿到保存在 ConfigMap 中的 cluster-info（它保存了 APIServer 的授权信息）。而 bootstrap token，扮演的就是这个过程中的安全验证的角色。</p>
+</blockquote>
+<p>配置 kubeadm 的部署参数<br>强烈推荐使用 <code>kubeadm init --config kubeadm.yaml</code></p>
+</blockquote>
+<h3 id="12-牛刀小试：我的第一个容器化应用"><a href="#12-牛刀小试：我的第一个容器化应用" class="headerlink" title="12. 牛刀小试：我的第一个容器化应用"></a>12. 牛刀小试：我的第一个容器化应用</h3><blockquote>
+<p>Pod 就是 Kubernetes 世界里的“应用”；而一个应用，可以由多个容器组成。<br>Metadata：存放元数据<br>Spec：存放这个对象独有的定义，用来描述它所要表达的功能。</p>
+</blockquote>
+<h3 id="13-为什么我们需要-Pod-？"><a href="#13-为什么我们需要-Pod-？" class="headerlink" title="13. 为什么我们需要 Pod ？"></a>13. 为什么我们需要 Pod ？</h3><blockquote>
+<p>Pod，是 Kubernetes 项目中最小的 API 对象。同样是其<strong>原子调度单位</strong>。</p>
+<p>Kubernetes 项目所做的，其实就是将“进程组”的概念映射到了容器技术中，并使其成为了这个云计算“操作系统”里的“一等公民”。</p>
+<p>Kubernetes 项目的调度器，是统一按照 Pod 而非容器的资源需求进行计算的。</p>
+<p>像这样容器间的紧密协作，我们可以称为“超亲密关系”。这些具有“超亲密关系”容器的典型特征包括但不限于：互相之间会发生直接的文件交换、使用 localhost 或者 Socket 文件进行本地通信、会发生非常频繁的远程调用、需要共享某些 Linux Namespace（比如，一个容器要加入另一个容器的 Network Namespace）等等。</p>
+<p>Pod 只是一个逻辑概念，Kubernetes 真正处理的，还是宿主机操作系统上 Linux 容器的 Namespace 和 Cgroups，而并不存在一个所谓的 Pod 的边界或者隔离环境。</p>
+<p>Pod，其实是一组共享了某些资源的容器。共享的是同一个 Network Namespace，并且可以声明共享同一个 Volume。</p>
+<p>在 Kubernetes 项目里，Pod 的实现需要使用一个中间容器，这个容器叫作 Infra 容器。在这个 Pod 中，Infra 容器永远都是第一个被创建的容器，而其他用户定义的容器，则通过 Join Network Namespace 的方式，与 Infra 容器关联在一起。</p>
+<p>如果一个 pod 里定义了两个容器 A 和 B，对于 A 和 B：</p>
+<ul>
+<li>它们可以直接使用 localhost 进行通信</li>
+<li>它们看到的网络设备跟 Infra 容器看到的完全一样</li>
+<li>一个 Pod 只有一个 IP 地址，也就是这个 Pod 的 Network Namespace 对应的 IP 地址</li>
+<li>当然，其他的所有网络资源，都是一个 Pod 一份，并且被该 Pod 中的所有容器共享</li>
+<li>Pod 的生命周期只跟 Infra 容器一致，而与容器 A 和 B 无关</li>
+</ul>
+<p>sidecar ：我们可以在一个 Pod 中，启动一个辅助容器，来完成一些独立于主进程（主容器）之外的工作。可使用 initContainers。</p>
+<blockquote>
+<p>Pod，实际上是在扮演传统基础设施里“虚拟机”的角色；而容器，则是这个虚拟机里运行的用户程序。</p>
+</blockquote>
+</blockquote>
+<h3 id="14-深入解析-Pod-对象（一）：基本概念"><a href="#14-深入解析-Pod-对象（一）：基本概念" class="headerlink" title="14. 深入解析 Pod 对象（一）：基本概念"></a>14. 深入解析 Pod 对象（一）：基本概念</h3><blockquote>
+<p>容器是 Pod 属性里的一个普通的字段，那么到底哪些属性属于 Pod 对象，而又有哪些属性属于 Container 呢？</p>
+<ul>
+<li><p>把 Pod 看成传统环境里的“机器”，把容器看作是运行在这个“机器”里的用户程序。</p>
+</li>
+<li><p><strong>凡是调度、网络、存储、以及安全相关的属性，基本上是 Pod 级别的。</strong>它们描述的是“机器”这个整体，而不是里面运行的“程序”<br>几个重要字段的含义和用法：</p>
+<ul>
+<li>NodeSelector：绑定 Pod 和 Node。</li>
+<li>NodeName：一旦 Pod 的这个字段被赋值，Kubernetes 项目就会被认为这个 Pod 已经经过了调度，调度的结果就是赋值的节点名字。</li>
+<li>HostAliases：定义了 Pod 的 hosts 文件（比如 /etc/hosts）里的内容。</li>
+</ul>
+</li>
+<li><p>除了上述跟“机器”相关的配置外，<strong>凡是跟容器的 Linux Namespace 相关的属性，也一定是 Pod 级别的。</strong></p>
+<ul>
+<li>比如 shareProcessNamespace=true：这个 Pod 里的容器要共享 PID Namespace。</li>
+<li>凡是 Pod 中的容器要共享宿主机的 Namespace，也一定是 Pod 级别的定义，例如 hostNetwork、hostIPC、hostPID。</li>
+</ul>
+</li>
+<li><p>Pod 里最重要的字段当属 “Containers”，除了 Image、Command、workingDir、Ports、volumeMounts 外几个值得注意的属性（当然都属于 Container ）：</p>
+<ul>
+<li>ImagePullPolicy ：定义了镜像拉取的策略。</li>
+<li>Lifecycle ：定义的是 Container Lifecycle Hooks。在容器状态发生变化时（启动时、删除时）触发一系列“钩子”。</li>
+</ul>
+</li>
+</ul>
+<p>Pod 对象在 Kubernetes 中的生命周期，主要体现在 Pod API 对象的 Status 部分（pod.status.phase）：</p>
+<ol>
+<li>Pending：Pod 的 YAML 文件已经提交给了 Kubernetes，API 对象已经被创建并保存在 Etcd 当中。但是，这个 Pod 里有些容器因为某种原因而不能被顺利创建。比如，调度不成功。</li>
+<li>Running：Pod 已经调度成功，跟一个具体的节点绑定。它包含的容器都已经创建成功，并且至少有一个正在运行中。</li>
+<li>Succeeded：Pod 里的所有容器都正常运行完毕，并且已经退出了。这种情况在运行一次性任务时最为常见。</li>
+<li>Failed：Pod 里至少有一个容器以不正常的状态（非 0 的返回码）退出。这个状态的出现，意味着你得想办法 Debug 这个容器的应用，比如查看 Pod 的 Events 和日志。</li>
+<li>Unknown：这是一个异常状态，意味着 Pod 的状态不能持续地被 kubelet 汇报给 kube-apiserver，这很有可能是主从节点（Master 和 Kubelet）间的通信出现了问题。</li>
+</ol>
+<p>更进一步地，Pod 对象的 Status 字段，还可以再细分出一组 Conditions。它们主要用于描述造成当前 Status 的具体原因是什么。</p>
+</blockquote>
+<h3 id="15-深入解析-Pod-对象（二）：使用进阶"><a href="#15-深入解析-Pod-对象（二）：使用进阶" class="headerlink" title="15. 深入解析 Pod 对象（二）：使用进阶"></a>15. 深入解析 Pod 对象（二）：使用进阶</h3><blockquote>
+<p>Projected Volume：投射数据卷，为容器提供预先定义好的数据。</p>
+<ul>
+<li>Secret</li>
+<li>ConfigMap</li>
+<li>Downward API：让 Pod 里的容器能够直接获取到这个 Pod API 对象本身的信息。</li>
+<li>ServiceAccountToken</li>
+</ul>
+<p>Kubernetes 中并没有 Docker 的 Stop 语义。所以虽然是 Restart（重启），但实际却是重新创建了容器。<br>这个功能就是 Kubernetes 里的Pod 恢复机制，也叫 restartPolicy。它是 Pod 的 Spec 部分的一个标准字段（pod.spec.restartPolicy），默认值是 Always</p>
+<ul>
+<li>Always：在任何情况下，只要容器不在运行状态，就自动重启容器</li>
+<li>OnFailure：只在容器异常时才自动重启容器</li>
+<li>Never：从来不重启容器</li>
+</ul>
+<p>两个基本的设计原理：</p>
+<ul>
+<li>只要 Pod 的 restartPolicy 指定的策略允许重启异常的容器（比如：Always），那么这个 Pod 就会保持 Running 状态，并进行容器重启。否则，Pod 就会进入 Failed 状态 。</li>
+<li>对于包含多个容器的 Pod，只有它里面所有的容器都进入异常状态后，Pod 才会进入 Failed 状态。在此之前，Pod 都是 Running 状态。此时，Pod 的 READY 字段会显示正常容器的个数。</li>
+</ul>
+<p>PodPreset（Pod 预设置）</p>
+<ul>
+<li>PodPreset 里定义的内容，只会在 Pod API 对象被创建之前追加在这个对象本身上，而不会影响任何 Pod 的控制器的定义。</li>
+</ul>
+</blockquote>
+<h3 id="16-编排其实很简单：谈谈“控制器”模型"><a href="#16-编排其实很简单：谈谈“控制器”模型" class="headerlink" title="16. 编排其实很简单：谈谈“控制器”模型"></a>16. 编排其实很简单：谈谈“控制器”模型</h3><blockquote>
+<p>Pod 这个看似复杂的 API 对象，实际上就是对容器的进一步抽象和封装而已。</p>
+<p> kube-controller-manager 组件是一系列控制器的集合，这些控制器都遵循 Kubernetes 项目中的一个通用编排模式，即：控制循环（control loop）。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">for &#123;</span><br><span class="line"> 实际状态 :&#x3D; 获取集群中对象 X 的实际状态（Actual State）</span><br><span class="line"> 期望状态 :&#x3D; 获取集群中对象 X 的期望状态（Desired State）</span><br><span class="line"> if 实际状态 &#x3D;&#x3D; 期望状态&#123;</span><br><span class="line">   什么都不做</span><br><span class="line"> &#125; else &#123;</span><br><span class="line">   执行编排动作，将实际状态调整为期望状态</span><br><span class="line"> &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>实际状态往往来自 Kubernetes 集群本身，期望状态一般来自于用户提交的 YAML 文件。</p>
+</blockquote>
+<h3 id="17-经典-PaaS-的记忆：作业副本与水平扩展"><a href="#17-经典-PaaS-的记忆：作业副本与水平扩展" class="headerlink" title="17. 经典 PaaS 的记忆：作业副本与水平扩展"></a>17. 经典 PaaS 的记忆：作业副本与水平扩展</h3><blockquote>
+<p>Deployment 的重要功能：Pod 的“水平扩展 / 收缩”（horizontal scaling out/in）。<br>Deployment 滚动更新能力依赖的是 ReplicaSet 对象。<br>一个 ReplicaSet 对象，其实就是由副本数目的定义和一个 Pod 模板组成的。Deployment 控制器实际操控的，正是这样的 ReplicaSet 对象，而不是 Pod 对象。</p>
+<p>一个定义了 replicas=3 的 Deployment，与它的 ReplicaSet，以及 Pod 的关系，实际上是一种“层层控制”的关系。<br><img src="http://xhisall.gitee.io/image/image/ab4902a0437af4347bec520468c5e7cd.png"></p>
+<p>水平扩展/伸缩：是需要修改它所控制的 ReplicaSet 的 Pod 的副本个数</p>
+<p><img src="http://xhisall.gitee.io/image/image/79dcd2743645e39c96fafa6deae9d6f6.png"><br> 如上图所示，Deployment 的控制器，实际上控制的是 ReplicaSet 的数目，以及每个 ReplicaSet 的属性。<br> 而一个应用的版本，对应的正是一个 ReplicaSet，这个版本应用的 Pod 数量，则由 ReplicaSet 通过它自己的控制器（ReplicaSet Controller）来保证。</p>
+<p>  spec.revisionHistoryLimit：Kubernetes 为 Deployment 保留的“历史版本”个数</p>
+</blockquote>
+<h3 id="18-深入理解-StatefulSet（一）：拓扑状态"><a href="#18-深入理解-StatefulSet（一）：拓扑状态" class="headerlink" title="18. 深入理解 StatefulSet（一）：拓扑状态"></a>18. 深入理解 StatefulSet（一）：拓扑状态</h3><blockquote>
+<p>Deployment 实际上并不足以覆盖所有的应用编排问题，根本原因在于 Deployment 对应用做了一个简单化假设。它认为，一个应用的所有 Pod，是完全一样的。所以它们互相之间没有顺序，也无所谓运行在哪台宿主机上，根据需求随时创建或 kill 掉。但是在实际的场景中，并不是所有的应用都可以满足这样的要求。</p>
+<p>实例之间有不对等关系，以及实例对外部数据有依赖关系的应用，被称为”有状态应用“（Stateful Application）</p>
+<p>容器用来封装”无状态应用“（Stateless Application），尤其是 Web 服务，非常好用，但是一旦要使用容器运行 ”有状态应用“，困难程度会直线上升。</p>
+<p> Kubernetes 在 Deployment 的基础上，扩展出了对”有状态应用“的初步支持：StatefulSet。<br> 它把真实世界里的应用状态，抽象成了两种情况：</p>
+<ol>
+<li>拓扑状态。这种情况意味着，应用的多个实例之间不是完全对等的关系。比如特定的启动顺序，唯一的网络标识符。</li>
+<li>存储状态。这种情况意味着，应用的多个实例分别绑定了不同的存储数据。比如持久稳定的存储。<br>StatefulSet 的核心功能，就是通过某种方式记录这些状态，然后在 Pod 被重新创建时，能够为新 Pod 恢复这些状态。  </li>
+</ol>
+<p>一个 Kubernetes 项目中非常实用的概念：Headless Service。<br>Service 被访问的方式：</p>
+<ol>
+<li>VIP（Virtual IP）方式。</li>
+<li>DNS 方式：<ul>
+<li>Normal Service：访问 ”my-svc.my-namespace.svc.cluster.local” 解析到的是 Service 的 VIP，后面的流程跟 VIP 方式一致。</li>
+<li>Headless Service：访问 “my-svc.my-namespace.svc.cluster.local” 解析到的<strong>直接</strong>就是 my-svc 代理的某一个 Pod 的 IP 地址。</li>
+</ul>
+</li>
+</ol>
+<p>Headless Service 的 clusterIP 值为 <strong>None</strong>，即：这个 Service，没有一个 VIP 作为“头”。这也就是 Headless 的含义。所以，这个 Service 被创建后并不会被分配一个 VIP，而是会以 DNS 记录的方式暴露出它所代理的 Pod。<br>当创建 Headless Service 后，它所代理的所有 Pod 的 IP 地址，都会被绑定一个 DNS 记录：<br><code>&lt;pod-name&gt;.&lt;svc-name&gt;.&lt;namespace&gt;.svc.cluster.local</code><br>这个 DNS 记录，正是 Kubernetes 项目为 Pod 分配的唯一的“可解析身份”（Resolvable Identity）。有了这个“可解析身份”，只要你知道了一个 Pod 的名字，以及它对应的 Service 的名字，你就可以非常确定地通过这条 DNS 记录访问到 Pod 的 IP 地址。</p>
+<p>StatefulSet 在使用  Headless Service 时，会给它所管理的所有 Pod 的名字进行编号，而且这些编号都是从 0 开始累加，与 StatefulSet 的每个 Pod 实例一一对应，绝不重复。更重要的是，这些 Pod 的创建，也是严格按照编号顺序进行的，比如当 web-0 进入到 Ready 之前，web-1 会一直处于 Pending 状态。当删除原来的 Pod 后，Kubernetes 会按照原先编号的顺序创建两个新 Pod，并给它们分配与原来相同的 hostname。</p>
+<p>通过这种方法，Kubernetes 就成功地将 Pod 的拓扑状态（比如：哪个节点先启动，哪个节点后启动），按照 Pod 的“名字 + 编号”的方式固定了下来。此外，Kubernetes 还为每一个 Pod 提供了一个固定并且唯一的访问入口，即：这个 Pod 对应的 DNS 记录。</p>
+<p> 总结：</p>
+<blockquote>
+<p>StatefulSet 这个控制器的主要作用之一，就是使用 Pod 模板创建 Pod 的时候，对它们进行编号，并且按照编号顺序逐一完成创建工作。而当 StatefulSet 的“控制循环”发现 Pod 的“实际状态”与“期望状态”不一致，需要新建或者删除 Pod 进行“调谐”的时候，它会严格按照这些 Pod 编号的顺序，逐一完成这些操作。</p>
+</blockquote>
+</blockquote>
+<h3 id="19-深入理解-StatefulSet（二）：存储状态"><a href="#19-深入理解-StatefulSet（二）：存储状态" class="headerlink" title="19. 深入理解 StatefulSet（二）：存储状态"></a>19. 深入理解 StatefulSet（二）：存储状态</h3><blockquote>
+<p> StatefulSet 对存储状态的管理机制主要使用的是一个叫作 Persistent Volume Claim 的功能。</p>
+<p> StatefulSet 的工作原理：</p>
+<ul>
+<li>StatefulSet 的控制器直接管理的是 Pod。这是因为 StatefulSet 里的不同 Pod 实例，不再像 ReplicaSet 中那样都是完全一样的，而是有细微区别的。比如，每个 Pod 的 hostname、名字等都是不同的、携带了编号的。而 StatefulSet 区分这些实例的方式，就是通过在 Pod 的名字里加上事先约定好的编号。</li>
+<li>Kubernetes 通过 Headless Service，为这些有编号的 Pod，在 DNS 服务器中生成带有同样编号的 DNS 记录。只要 StatefulSet 能够保证这些 Pod 名字里的编号不变，那么 Service 里类似于 web-0.nginx.default.svc.cluster.local 这样的 DNS 记录也就不会变，而这条记录解析出来的 Pod 的 IP 地址，则会随着后端 Pod 的删除和再创建而自动更新。这当然是 Service 机制本身的能力，不需要 StatefulSet 操心。</li>
+<li>StatefulSet 还为每一个 Pod 分配并创建一个同样编号的 PVC。这样，Kubernetes 就可以通过 Persistent Volume 机制为这个 PVC 绑定上对应的 PV，从而保证了每一个 Pod 都拥有一个独立的 Volume。即使 Pod 被删除，它所对应的 PVC 和 PV 依然会保留下来，所以当 Pod 被重新创建之后，Kubernetes 会为它找到同样编号的 PVC，挂载这个 PVC 对应的 Volume。</li>
+</ul>
+<p>StatefulSet 其实就是一种特殊的 Deployment，而其独特之处在于，它的每个 Pod 都被编号了。而且，这个编号会体现在 Pod 的名字和 hostname 等标识信息上，这不仅代表了 Pod 的创建顺序，也是 Pod 的重要网络标识（即：在整个集群里唯一的、可被的访问身份）。<br>有了这个编号后，StatefulSet 就使用 Kubernetes 里的两个标准功能：Headless Service 和 PV/PVC，实现了对 Pod 的拓扑状态和存储状态的维护。</p>
+</blockquote>
+<h3 id="21-容器化守护进程的意义：DaemonSet"><a href="#21-容器化守护进程的意义：DaemonSet" class="headerlink" title="21. 容器化守护进程的意义：DaemonSet"></a>21. 容器化守护进程的意义：DaemonSet</h3><blockquote>
+<p>DaemonSet 的主要作用，是让你在 Kubernetes 集群里，运行一个 Daemon Pod。 所以，这个 Pod 有如下三个特征：</p>
+<ol>
+<li>这个 Pod 运行在 Kubernetes 集群里的每一个节点（Node）上；</li>
+<li>每个节点上只有一个这样的 Pod 实例；</li>
+<li>当有新的节点加入 Kubernetes 集群后，该 Pod 会自动地在新节点上被创建出来；而当旧节点被删除后，它上面的 Pod 也相应地会被回收掉。</li>
+</ol>
+<p><strong>更重要的是</strong>，跟其他编排对象不一样，DaemonSet 开始运行的时机，很多时候比整个 Kubernetes 集群出现的时机都要早。（网络插件 Agent）</p>
+</blockquote>
+<blockquote>
+<p>DaemonSet 其实是一个非常简单的控制器。在它的控制循环中，只需要遍历所有节点，然后根据节点上是否有被管理 Pod 的情况，来决定是否要创建或者删除一个 Pod。</p>
+<p>只不过，在创建每个 Pod 的时候，DaemonSet 会自动给这个 Pod 加上一个 nodeAffinity，从而保证这个 Pod 只会在指定节点上启动。同时，它还会自动给这个 Pod 加上一个 Toleration，从而忽略节点的 unschedulable“污点”。</p>
+<p>DaemonSet 使用 ControllerRevision，来保存和管理自己对应的“版本”。这个 ControllerRevision 对象，实际上是在 Data 字段保存了该版本对应的完整的 DaemonSet 的 API 对象。并且，在 Annotation 字段保存了创建这个对象所使用的 kubectl 命令。（ControllerRevision 其实是一个通用的版本管理对象）</p>
+</blockquote>
+<h3 id="22-撬动离线业务：Job-与-CronJob"><a href="#22-撬动离线业务：Job-与-CronJob" class="headerlink" title="22. 撬动离线业务：Job 与 CronJob"></a>22. 撬动离线业务：Job 与 CronJob</h3><blockquote>
+<p>Job 对象在创建后，它的 Pod 模板，被自动加上了一个  controller-uid=&lt; 一个随机字符串 &gt; 这样的 Label。而这个 Job 对象本身，则被自动加上了这个 Label 对应的 Selector，从而保证了 Job 与它所管理的 Pod 之间的匹配关系。</p>
+<p>restartPolicy 在 Job 对象里只允许被设置为 Never 和 OnFailure</p>
+<ul>
+<li>Never：离线作业失败后 Job Controller 就会不断地尝试创建一个新 Pod</li>
+<li>OnFailure：不会创建新的 Pod，但是会不断地重启 Pod 中的容器</li>
+</ul>
+<p>spec.backoffLimit：设置重启次数<br>spec.activeDeadlineSeconds：设置最长运行时间</p>
+<p>Job Controller 对并行作业的控制方法：</p>
+<ul>
+<li>spec.parallelism：最大并行数，spec.completions：最小完成数</li>
+<li>首先，Job Controller 控制的对象，直接就是 Pod。</li>
+<li>其次，Job Controller 在控制循环中进行的调谐（Reconcile）操作，是根据实际在 Running 状态 Pod 的数目、已经成功退出的 Pod 的数目，以及 parallelism、completions 参数的值共同计算出在这个周期里，应该创建或者删除的 Pod 数目，然后调用 Kubernetes API 来执行这个操作。</li>
+</ul>
+<p>CronJob：一个 Job 对象的控制器</p>
+<ul>
+<li>spec.schedule：Unix Cron 表达式</li>
+<li>concurrencyPolicy：<ul>
+<li>Allow：Job 可以同时存在</li>
+<li>Forbid：不会创建新的 Pod，该创建周期被跳过</li>
+<li>Replace：新产生的 Job 会替换旧的、没有执行完的 Job</li>
+</ul>
+</li>
+</ul>
+<p>spec.startingDeadlineSeconds：如果某一次 Job 创建失败，这次创建就会被标记成“miss”。当在指定的时间窗口内，miss 的数目达到 100 时，CronJob 会停止再创建这个 Job。</p>
+</blockquote>
+<h3 id="23-声明式API与Kubernetes编程范式"><a href="#23-声明式API与Kubernetes编程范式" class="headerlink" title="23. 声明式API与Kubernetes编程范式"></a>23. 声明式API与Kubernetes编程范式</h3><blockquote>
+<p>kubectl replace：使用新的 YAML 文件中的 API 对象，替换原有的 API 对象。一次只能处理一个写请求。<br>kubectl apply（<strong>声明式 API</strong>）：执行了一个对原有 API 对象的 PATCH 操作，一次能处理多个写操作，并且具备 Merge 能力。</p>
+<p>Kubernetes 能够对 API 对象进行在线更新的能力，这也是 Kubernetes “声明式 API”的独特之处：</p>
+<ul>
+<li>首先，所谓“声明式”，指的就是我只需要提交一个定义好的 API 对象来“声明”，我所期望的状态是什么样子。</li>
+<li>其次，“声明式 API”允许有多个 API 写端，以 PATCH 的方式对 API 对象进行修改，而无需关心本地原始 YAML 文件的内容。</li>
+<li>最后，也是最重要的，有了上述两个能力，Kubernetes 项目才可以基于对 API 对象的增、删、改、查，在完全无需外界干预的情况下，完成对“实际状态”和“期望状态”的调谐（Reconcile）过程。<br>所以说，声明式 API，才是 Kubernetes 项目编排能力“赖以生存”的核心所在。</li>
+</ul>
+<p>[24]. 深入解析声明式 API（一）：API 对象的奥秘<br>[25]. 深入解析声明式 API（二）：编写自定义控制器</p>
+</blockquote>
+<h3 id="26-基于角色的权限控制：RBAC"><a href="#26-基于角色的权限控制：RBAC" class="headerlink" title="26. 基于角色的权限控制：RBAC"></a>26. 基于角色的权限控制：RBAC</h3><blockquote>
+<p>在 Kubernetes 中，负责完成授权（Authorization）工作的机制，就是 RBAC：基于角色的访问控制（Role-Based Access Control）</p>
+<ul>
+<li>Role：角色，它其实是一组规则，定义了一组对 Kubernetes API 对象的操作权限。</li>
+<li>Subject：被作用者，既可以是“人”，也可以是“机器”，也可以是你在 Kubernetes 里定义的“用户”。</li>
+<li>RoleBinding：定义了“被作用者”和“角色”的绑定关系。</li>
+</ul>
+<p>Role</p>
+<ul>
+<li>namespace：首先指定了它能产生作用的 namespace。</li>
+<li>rules：它所定义的权限规则。下面规则的含义：允许”被作用者“，对 mynamespace 下面的 Pod 对象，进行 GET、WATCH 和 LIST 操作。</li>
+</ul>
+</blockquote>
+<figure class="highlight yaml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="attr">kind:</span> <span class="string">Role</span></span><br><span class="line"><span class="attr">apiVersion:</span> <span class="string">rbac.authorization.k8s.io/v1</span></span><br><span class="line"><span class="attr">metadata:</span></span><br><span class="line">  <span class="attr">namespace:</span> <span class="string">mynamespace</span></span><br><span class="line">  <span class="attr">name:</span> <span class="string">example-role</span></span><br><span class="line"><span class="attr">rules:</span></span><br><span class="line"><span class="bullet">-</span> <span class="attr">apiGroups:</span> [<span class="string">&quot;&quot;</span>]</span><br><span class="line">  <span class="attr">resources:</span> [<span class="string">&quot;pods&quot;</span>]</span><br><span class="line">  <span class="attr">verbs:</span> [<span class="string">&quot;get&quot;</span>, <span class="string">&quot;watch&quot;</span>, <span class="string">&quot;list&quot;</span>]</span><br></pre></td></tr></table></figure>
+<blockquote>
+<p>RoleBinding：指定被作用者</p>
+<ul>
+<li>subjects：被作用者，它的类型是 User，即 Kubernetes 里的用户。</li>
+<li>roleRef：通过这个字段，RoleBinding 对象就可以直接通过名字，来引用我们前面定义的 Role 对象（example-role），从而定义了“被作用者（Subject）”和“角色（Role）”之间的绑定关系。</li>
+</ul>
+</blockquote>
+<figure class="highlight yaml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="attr">kind:</span> <span class="string">RoleBinding</span></span><br><span class="line"><span class="attr">apiVersion:</span> <span class="string">rbac.authorization.k8s.io/v1</span></span><br><span class="line"><span class="attr">metadata:</span></span><br><span class="line">  <span class="attr">name:</span> <span class="string">example-rolebinding</span></span><br><span class="line">  <span class="attr">namespace:</span> <span class="string">mynamespace</span></span><br><span class="line"><span class="attr">subjects:</span></span><br><span class="line"><span class="bullet">-</span> <span class="attr">kind:</span> <span class="string">User</span></span><br><span class="line">  <span class="attr">name:</span> <span class="string">example-user</span></span><br><span class="line">  <span class="attr">apiGroup:</span> <span class="string">rbac.authorization.k8s.io</span></span><br><span class="line"><span class="attr">roleRef:</span></span><br><span class="line">  <span class="attr">kind:</span> <span class="string">Role</span></span><br><span class="line">  <span class="attr">name:</span> <span class="string">example-role</span></span><br><span class="line">  <span class="attr">apiGroup:</span> <span class="string">rbac.authorization.k8s.io</span></span><br></pre></td></tr></table></figure>
+<blockquote>
+<p>Role 和 RoleBinding 对象都是 Namespaced 对象，它们对权限的限制规则仅在它们自己的 Namespace 有效。roleRef 也只能引用当前 Namespace 里的 Role 对象。<br>对于非 Namespaced（Non-namespaced）对象（比如：Node），或者某一个 Role 想要作用于所有的 Namespace 的时候，需要使用 ClusterRole 和 ClusterRoleBinding 的组合。</p>
+<p>赋予所有权限：<code>verbs: [&quot;get&quot;, &quot;list&quot;, &quot;watch&quot;, &quot;create&quot;, &quot;update&quot;, &quot;patch&quot;, &quot;delete&quot;]</code></p>
+<p>在大多数时候，我们其实都不太使用”用户“这个功能，而是直接使用 Kubernetes 里的“内置用户”：<strong>ServiceAccount</strong></p>
+<ul>
+<li><p>定义一个 ServiceAccount。</p>
+</li>
+<li><p>通过编写 RoleBinding 的 YAML 文件，来为这个 ServiceAccount 分配权限。</p>
+</li>
+<li><p>创建 Role、ServiceAccount、RoleBinding 对象。</p>
+<p>在生产环境中，我强烈建议你为所有 Namespace 下的默认 ServiceAccount，绑定一个只读权限的 Role。</p>
+<p>除了前面使用的“用户”（User），Kubernetes 还拥有“用户组”（Group）的概念，也就是一组“用户”的意思。如果你为 Kubernetes 配置了外部认证服务的话，这个“用户组”的概念就会由外部认证服务提供。</p>
+</li>
+</ul>
+<p>实际上，一个 ServiceAccount，在 Kubernetes 里对应的“用户”的名字是：<code>system:serviceaccount:&lt;ServiceAccount 名字 &gt;</code><br>而它对应的内置“用户组”的名字，就是：<code>system:serviceaccounts:&lt;Namespace 名字 &gt;</code></p>
+<p>除此之外，Kubernetes 还提供了四个预先定义好的 ClusterRole 来供用户直接使用：</p>
+<ul>
+<li>cluster-admin</li>
+<li>admin</li>
+<li>edit</li>
+<li>view</li>
+</ul>
+<p>cluster-admin 是整个项目中的最高权限，务必要谨慎而小心地使用它。</p>
+<p>总结<br>所谓角色（Role），其实就是一组权限规则列表。而我们分配这些权限的方式，就是通过创建 RoleBinding 对象，将被作用者（subject）和权限列表进行绑定。</p>
+<p>另外，与之对应的 ClusterRole 和 ClusterRoleBinding，则是 Kubernetes 集群级别的 Role 和 RoleBinding，它们的作用范围不受 Namespace 限制。</p>
+<p>而尽管权限的被作用者可以有很多种（比如，User、Group 等），但在我们平常的使用中，最普遍的用法还是 ServiceAccount。</p>
+</blockquote>
+</div></article></div></main><footer><div class="paginator"><a href="/2020/12/25/kubernetes-note-1/" class="next">NEXT</a></div><div class="copyright"><p>© 2015 - 2020 <a href="http://woodpile27.cn">John Doe</a>, powered by <a href="https://hexo.io/" target="_blank">Hexo</a> and <a href="https://github.com/pinggod/hexo-theme-apollo" target="_blank">hexo-theme-apollo</a>.</p></div></footer></div><script async src="//cdn.bootcss.com/mathjax/2.7.0/MathJax.js?config=TeX-MML-AM_CHTML" integrity="sha384-crwIf/BuaWM9rM65iM+dWFldgQ1Un8jWZMuh3puxb8TOY9+linwLoI7ZHZT+aekW" crossorigin="anonymous"></script></body></html>

@@ -2,6 +2,13 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   
   <url>
+    <loc>http://woodpile27.cn/2020/12/28/kubernetes-note-2/</loc>
+    
+    <lastmod>2020-12-28</lastmod>
+    
+  </url>
+  
+  <url>
     <loc>http://woodpile27.cn/2020/12/25/kubernetes-note-1/</loc>
     
     <lastmod>2020-12-25</lastmod>
@@ -60,7 +67,7 @@
 
   <url>
     <loc>http://woodpile27.cn/</loc>
-    <lastmod>2020-12-25</lastmod>
+    <lastmod>2020-12-28</lastmod>
     <changefreq>daily</changefreq>
     <priority>1.0</priority>
   </url>
