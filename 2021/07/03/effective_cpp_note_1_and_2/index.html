@@ -1,0 +1,101 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="X-UA-Compatible" content="IE=edge"><title> c++： effective c++笔记一、二章 · woodpile27</title><meta name="description" content="c++： effective c++笔记一、二章 - John Doe"><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="icon" href="/favicon.png"><link rel="stylesheet" href="/css/apollo.css"><link rel="search" type="application/opensearchdescription+xml" href="http://woodpile27.cn/atom.xml" title="woodpile27"><meta name="generator" content="Hexo 5.0.2"><link rel="alternate" href="/atom.xml" title="woodpile27" type="application/atom+xml">
+</head><body><div class="wrap"><header><a href="/" class="logo-link"><img src="/favicon.png" alt="logo"></a><ul class="nav nav-list"><li class="nav-list-item"><a href="/" target="_self" class="nav-list-link">BLOG</a></li><li class="nav-list-item"><a href="/archives/" target="_self" class="nav-list-link">ARCHIVE</a></li><li class="nav-list-item"><a href="https://github.com/woodpile27" target="_blank" class="nav-list-link">GITHUB</a></li><li class="nav-list-item"><a href="/atom.xml" target="_self" class="nav-list-link">RSS</a></li></ul></header><main class="container"><div class="post"><article class="post-block"><h1 class="post-title">c++： effective c++笔记一、二章</h1><div class="post-info">Jul 3, 2021</div><div class="post-content"><h3 id="01-视-c-为一个语言联邦"><a href="#01-视-c-为一个语言联邦" class="headerlink" title="01: 视 c++ 为一个语言联邦"></a>01: 视 c++ 为一个语言联邦</h3><p>c++ 的四个次语言：</p>
+<ul>
+<li>c</li>
+<li>object-oriented c++。面向对象设计，类、封装、继承、多态、虚函数…</li>
+<li>Template c++。泛型编程。</li>
+<li>STL。容器、迭代器、算法、函数对象。</li>
+</ul>
+<h3 id="02-尽量以-const-enum-inline-替换-define"><a href="#02-尽量以-const-enum-inline-替换-define" class="headerlink" title="02: 尽量以 const, enum, inline 替换 #define"></a>02: 尽量以 const, enum, inline 替换 #define</h3><ul>
+<li>对于单纯常量，最好以 const 对象或 enums 替换 #define</li>
+</ul>
+<p><code>#define</code> 不被视为语言的一部分，当<code>#define RATIO 1.653</code>时，编译器也许看不到 RATIO，它也不会进去记号表，编译器只能看到 1.653。用常量是一个更好的方式：<code>const double RATIO = 1.653</code></p>
+<p>class 专属常量：<br>确保此常量至多只有一份实体，必须让它成为一个 static 成员: <code>static const int NumTurns = 5</code><br>如果编译器不允许 static 整数型 class 常量完成 in class 处置设定，可以使用 the enum hack：<code>enum &#123; NumTurns = 5 &#125;</code></p>
+<h3 id="03-尽可能使用-const"><a href="#03-尽可能使用-const" class="headerlink" title="03: 尽可能使用 const"></a>03: 尽可能使用 const</h3><ul>
+<li>将某些东西声明为 const 可帮助编译器侦测出错误用法。const 可被施加于任何作用域内的对象、函数参数、函数返回类型、成员函数本体。</li>
+</ul>
+<p>const 修饰指针自身、指针所指物：<br><code>const char* const p = greeting</code><br>const 出现在 * 左边表示被指物是常量，* 右边表示指针自身是常量</p>
+<p>令函数返回一个常量值，往往可以降低因客户失误而造成的意外，又不至于放弃安全性和高效性<br>对于参数，尽可能声明为 const，除非有需要改动参数或 local 对象</p>
+<p>const 成员函数：将 const 实施于成员函数的目的，是为了确认该成员函数可作用于 const 对象身上。<br>说的直接一点：如果成员函数中不改变成员变量，应加以 const 修饰。若这类函数不加以 const 修饰，则常量对象（注意是 const 对象）则不能调用这些函数。</p>
+<ul>
+<li>编译器强制实施 bitwise constness，但你编写程序时应该使用“概念上的常量性”</li>
+</ul>
+<p>成员函数如果是 const 到底意味着什么？<br>bitwise constness：成员函数只有在不改变对象之任何成员变量（static 除外）时才可以说是 const。<br>但是许多成员函数不完全具备上述性质却能通过编译：一个更改了“指针所指物”的成员函数虽然不能算是 const，但如果只有指针隶属于对象，则能通过编译。</p>
+<p>这种情况导出所谓的 logical constness：一个 const 成员函数可以修改它所处理的对象内的某些 bits，但只有在客户端侦测不出的情况下才得如此。<br>对于即使在 const 成员函数内也可能会被修改的成员变量：<code>mutable std::size_t textLength</code>，<code>mutable</code>可以释放掉 non-static 成员变量的 bitwise constness 约束。</p>
+<ul>
+<li>当 const 和 non-const 成员函数有着实质等价的实现时，令 non-const 版本调用 const 可避免代码重复</li>
+</ul>
+<p>两个成员函数如果只是常量性不同，可以被重载。当 const 和 non-const 成员函数有着实质等价的实现时，令 non-const 版本调用 const 可避免代码重复</p>
+<h3 id="04-确定对象在使用前已先被初始化"><a href="#04-确定对象在使用前已先被初始化" class="headerlink" title="04: 确定对象在使用前已先被初始化"></a>04: 确定对象在使用前已先被初始化</h3><ul>
+<li><p>为内置型对象进行手工初始化，因为 c++ 不保证初始化它们</p>
+</li>
+<li><p>构造函数最好使用初值列，而不要在构造函数本体内使用赋值操作。初值列列出的成员变量，其排列次序应该和它们在 class 中的声明次序相同</p>
+</li>
+</ul>
+<p>确保每一个构造函数都将对象的每一个成员初始化。<br>对象的成员变量的初始化动作发生在进入构造函数本体之前，较佳写法是用初值列替换赋值动作。</p>
+<p>总是使用初值列。总是在初值列中列出所有成员变量，以免还得记住哪些成员变量无需初值。</p>
+<ul>
+<li>为免除“跨编译单元之初始化次序”的问题，请以 local static 对象替换 non-local static 对象 </li>
+</ul>
+<h3 id="05：了解-c-默默编写并调用哪些函数"><a href="#05：了解-c-默默编写并调用哪些函数" class="headerlink" title="05：了解 c++ 默默编写并调用哪些函数"></a>05：了解 c++ 默默编写并调用哪些函数</h3><ul>
+<li>编译器可以暗自为 class 创建 default 构造函数、copy 构造函数、copy assignment 操作符，以及析构函数</li>
+</ul>
+<p>对于含有指针等需要深拷贝的类，需要自己编写构造函数等，含有 const 成员同样如此。</p>
+<h3 id="06：若不想使用编译器自动生成的函数，就该明确拒绝"><a href="#06：若不想使用编译器自动生成的函数，就该明确拒绝" class="headerlink" title="06：若不想使用编译器自动生成的函数，就该明确拒绝"></a>06：若不想使用编译器自动生成的函数，就该明确拒绝</h3><ul>
+<li>为驳回编译器自动提供的机能，可将相应的成员函数声明为 parivate 并且不予实现。使用像 Uncopyable 这样的 base class 也是一种做法。</li>
+</ul>
+<p>所有编译器产出的函数都是 public，如果想编写一个不能进行 copy/copy assgin 操作的类，一个方式是将 copy 构造函数或 copy assignment 操作符声明（注意是只有声明没有实现，没有实现是阻止内置函数和友元）为 private。阻止编译器自动创建，也阻止其被调用。</p>
+<p>为了将连接期错误移至编译期，还可以创建一个专门为了阻止 copying 动作而设计的基类。</p>
+<blockquote>
+<p>⚠️在 c++ 11 中，优先使用删除函数而非 private 未定义函数 ———《effective modern c++》条款</p>
+<p><code>public basic_ios(const basic_ioc&amp; ) = delete;</code><br>删除函数要被定义为 public，因为调用成员函数时 c++ 会先校验可访问性，后校验删除状态</p>
+</blockquote>
+<h3 id="07：为多态基类声明-vitrual-析构函数"><a href="#07：为多态基类声明-vitrual-析构函数" class="headerlink" title="07：为多态基类声明 vitrual 析构函数"></a>07：为多态基类声明 vitrual 析构函数</h3><ul>
+<li>polymorphic（带多态性质的）base classes 应该声明一个 virtual 析构函数。如果 class 带有任何 virtual 函数，它就应该拥有一个 virtual 析构函数</li>
+</ul>
+<p>带有多态性质的基类必须将析构函数声明为虚函数，防止指向子类的基类指针在被释放时只局部销毁了对象。如果没有声明为虚函数，被执行的会是基类的析构函数。<br>只有当 class 内含至少一个 virtual 函数时才为它声明 virtual 析构函数。</p>
+<ul>
+<li>Classes 的设计目的如果不是作为 base classes 使用，或不是为了具备多态性，就不该声明 virtual 析构函数</li>
+</ul>
+<blockquote>
+<p>c++ 11 中提供了 final 关键字，可以阻止被声明的类被继承</p>
+</blockquote>
+<h3 id="08：别让异常逃离析构函数"><a href="#08：别让异常逃离析构函数" class="headerlink" title="08：别让异常逃离析构函数"></a>08：别让异常逃离析构函数</h3><ul>
+<li>析构函数绝对不要吐出异常。如果一个被析构函数调用的函数可能抛出函数，析构函数应该捕捉任何异常，然后吞下它们（不传播）或结束程序</li>
+</ul>
+<p>当析构函数吐出异常时，程序可能会崩溃或者出现不明确行为</p>
+<ul>
+<li>如果客户需要对某个操作函数运行期间抛出的异常做出反应，那么 class 应该提供一个普通函数（而非在析构函数中）执行该操作。</li>
+</ul>
+<p>但如果析构函数必须执行一个动作，而该动作可能会在失败时发生异常，一个较好的策略是重新设计接口，把可能发生异常的部分（比如关闭连接）挪到另外一个函数中，要求用户主动调用。而如果用户没有那么做的话，析构函数会调用并吞下或结束程序。这样用户就没有抱怨的理由。</p>
+<h3 id="09：绝不在构造和析构函数中调用-virtual-函数"><a href="#09：绝不在构造和析构函数中调用-virtual-函数" class="headerlink" title="09：绝不在构造和析构函数中调用 virtual 函数"></a>09：绝不在构造和析构函数中调用 virtual 函数</h3><ul>
+<li>在构造和析构期间不要调用 virtual 函数，因为这类调用从不下降至派生类</li>
+</ul>
+<p>当构造派生类时，基类的构造函数一定会被更早的调用，而在基类构造期间，对象的类型是基类，而不是派生类。而如果基类的构造函数中调用了 virtual 函数，它同样会调用基类的相应函数。 </p>
+<h3 id="10：令-operator-返回一个-reference-to-this"><a href="#10：令-operator-返回一个-reference-to-this" class="headerlink" title="10：令 operator= 返回一个 reference to * this"></a>10：令 operator= 返回一个 reference to * this</h3><p>为了实现“连锁赋值”（x = y = z = 15），赋值操作符必须返回一个 reference 指向操作符的左侧实参。<br>虽然不这样也能通过编译，但是一个原则是让自己的接口和内置类型相同功能的接口尽可能相似。</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">Wigget&amp; <span class="keyword">operator</span>=(<span class="keyword">const</span> Widget&amp; rhs)</span><br><span class="line">&#123;</span><br><span class="line">    ...</span><br><span class="line">    <span class="keyword">return</span> *<span class="keyword">this</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h3 id="11：在-operator-中处理“自我赋值”"><a href="#11：在-operator-中处理“自我赋值”" class="headerlink" title="11：在 operator= 中处理“自我赋值”"></a>11：在 operator= 中处理“自我赋值”</h3><ul>
+<li>确保当对象自我赋值时 operator= 有良好行为。其中技术包括比较“来源对象”和“目标对象“的地址、精心周到的语句顺序、以及 copy-and-swap</li>
+</ul>
+<p>自我赋值虽然看起来有点蠢但是合法，此外赋值动作有时候并不是那么容易看出来，比如：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">a[i] &#x3D; a[j]; &#x2F;&#x2F; i&#x3D;j则是自我赋值</span><br><span class="line">*px &#x3D; *py; &#x2F;&#x2F; px、py指向同一个东西也是自我赋值</span><br></pre></td></tr></table></figure>
+
+<p>当一个对象管理了指针等内置数据时，对于可能出现的自我赋值要格外小心。以指针为例，当执行赋值前，通常要把原来指针指向的内容 delete，但如果是自我赋值，这会造成先把自己的资源释放掉了，再把其赋值给造成让指针指向了一个已经被删除的对象。</p>
+<p>第一种做法是在赋值前检测是不是“自我赋值”，这也是侯捷老师在《面向对象高级编程中提到的。</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">Widget&amp; Widget::<span class="keyword">operator</span>=(<span class="keyword">const</span> Weiget&amp; rhs)</span><br><span class="line">&#123;</span><br><span class="line">    <span class="keyword">if</span> (<span class="keyword">this</span> == &amp;rhs) <span class="keyword">return</span> *<span class="keyword">this</span>;</span><br><span class="line">    </span><br><span class="line">    <span class="keyword">delete</span> pb;</span><br><span class="line">    pc = <span class="keyword">new</span> Bitmap(*rhs.pb);</span><br><span class="line">    <span class="keyword">return</span> *<span class="keyword">this</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>但是上边的做法没有“异常安全性”，如果<code>new Bitmap</code>导致异常，那么 pb 会指向一块被删除的内存。<br>考虑下面的做法，可以解决“异常安全性”的问题</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">Widget&amp; Widget::<span class="keyword">operator</span>=(<span class="keyword">const</span> Widget&amp; rhs)</span><br><span class="line">&#123;</span><br><span class="line">    Bitmap* pOrig = pb;          <span class="comment">//记住原先的pb       </span></span><br><span class="line">    pb = <span class="keyword">new</span> Bitmap(*rhs.pb);    <span class="comment">//令pb指向*pb的一个副本，如果发生异常，pb还是会保持原样</span></span><br><span class="line">    <span class="keyword">delete</span> pOrig;               <span class="comment">//删除原来pb指向的内存</span></span><br><span class="line">    <span class="keyword">return</span> *<span class="keyword">this</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>如果很关心效率，可以把“证同测试”再次放到函数起始处，但需要估计”自我赋值“发生的频率，因为这项测试也需要成本。</p>
+<p>还有一个替代方案是 copy and swap 技术，见方案29。</p>
+<h3 id="12：复制对象时勿忘其每一个成分"><a href="#12：复制对象时勿忘其每一个成分" class="headerlink" title="12：复制对象时勿忘其每一个成分"></a>12：复制对象时勿忘其每一个成分</h3><ul>
+<li>Copying 函数应该确保复制“对象内的所有成员变量”以“所有 base class 成分”</li>
+</ul>
+<p>如果你为 class 添加一个成员变量，必须同时修改拷贝构造函数，也需要修改所有的构造函数和赋值操作符。如果你忘记，编译器可能不会报错。</p>
+<p>当给派生类编写拷贝构造函数时，必须很小心的复制其基类的每个成分，这些成分往往是 private 的，所以你无法访问它们，应该让派生类的拷贝构造函数调用基类的拷贝构造函数，赋值时也应如此</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">DerivedClass::DerivedClass(<span class="keyword">const</span> DerivedClass&amp; rhs)</span><br><span class="line">    : BaseClass(rhs), ... &#123; ... &#125;</span><br><span class="line">    </span><br><span class="line">DerivedClass&amp;</span><br><span class="line">DerivedClass::<span class="keyword">operator</span>=(<span class="keyword">const</span> DerivedClass&amp; rhs)</span><br><span class="line">&#123; </span><br><span class="line">    BaseClass::<span class="keyword">operator</span>=(rhs);</span><br><span class="line">    ...</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<ul>
+<li>不要尝试以某个 copying 函数实现另一个 copying 函数。应该将共同机能放进第三个函数中，并由两个 copying 函数共同调用。</li>
+</ul>
+</div></article></div></main><footer><div class="paginator"><a href="/2021/06/05/customize-mapreduce-outputformat/" class="next">NEXT</a></div><div class="copyright"><p>© 2015 - 2021 <a href="http://woodpile27.cn">John Doe</a>, powered by <a href="https://hexo.io/" target="_blank">Hexo</a> and <a href="https://github.com/pinggod/hexo-theme-apollo" target="_blank">hexo-theme-apollo</a>.</p></div></footer></div><script async src="//cdn.bootcss.com/mathjax/2.7.0/MathJax.js?config=TeX-MML-AM_CHTML" integrity="sha384-crwIf/BuaWM9rM65iM+dWFldgQ1Un8jWZMuh3puxb8TOY9+linwLoI7ZHZT+aekW" crossorigin="anonymous"></script></body></html>

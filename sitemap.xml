@@ -2,6 +2,13 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   
   <url>
+    <loc>http://woodpile27.cn/2021/07/03/effective_cpp_note_1_and_2/</loc>
+    
+    <lastmod>2021-07-04</lastmod>
+    
+  </url>
+  
+  <url>
     <loc>http://woodpile27.cn/2021/06/05/customize-mapreduce-outputformat/</loc>
     
     <lastmod>2021-06-05</lastmod>
@@ -81,7 +88,7 @@
 
   <url>
     <loc>http://woodpile27.cn/</loc>
-    <lastmod>2021-06-05</lastmod>
+    <lastmod>2021-07-04</lastmod>
     <changefreq>daily</changefreq>
     <priority>1.0</priority>
   </url>
