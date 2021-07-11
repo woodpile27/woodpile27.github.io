@@ -1,0 +1,70 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="X-UA-Compatible" content="IE=edge"><title> c++：effective c++ 笔记第三章 · woodpile27</title><meta name="description" content="c++：effective c++ 笔记第三章 - John Doe"><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="icon" href="/favicon.png"><link rel="stylesheet" href="/css/apollo.css"><link rel="search" type="application/opensearchdescription+xml" href="http://woodpile27.cn/atom.xml" title="woodpile27"><meta name="generator" content="Hexo 5.0.2"><link rel="alternate" href="/atom.xml" title="woodpile27" type="application/atom+xml">
+</head><body><div class="wrap"><header><a href="/" class="logo-link"><img src="/favicon.png" alt="logo"></a><ul class="nav nav-list"><li class="nav-list-item"><a href="/" target="_self" class="nav-list-link">BLOG</a></li><li class="nav-list-item"><a href="/archives/" target="_self" class="nav-list-link">ARCHIVE</a></li><li class="nav-list-item"><a href="https://github.com/woodpile27" target="_blank" class="nav-list-link">GITHUB</a></li><li class="nav-list-item"><a href="/atom.xml" target="_self" class="nav-list-link">RSS</a></li></ul></header><main class="container"><div class="post"><article class="post-block"><h1 class="post-title">c++：effective c++ 笔记第三章</h1><div class="post-info">Jul 11, 2021</div><div class="post-content"><p>《effectivc c++》第三章关于使用智能指针的部分有很多在 c++2.0 时代已经有些过时，所以该部分的笔记综合了《effective modern c++》中智能指针的部分。</p>
+<h3 id="13：以对象管理资源"><a href="#13：以对象管理资源" class="headerlink" title="13：以对象管理资源"></a>13：以对象管理资源</h3><blockquote>
+<p>《effective modern c++》条款18：使用 std::unique_ptr 管理具备专属所有权的资源<br>《effective modern c++》条款19：使用 std::shared_ptr 管理具备共享所有权的资源</p>
+</blockquote>
+<ul>
+<li>std::unique_ptr 是小巧、高速的、具备只移型别的智能指针，对托管资源实施专属所有权定义</li>
+</ul>
+<p>当使用 unique_ptr 的时候，最多可以有一个 unique_ptr 指向一个资源。当 unique_ptr 被销毁时，资源会自动被回收。因为任何资源只能有一个 unique_ptr，所以任何对 unique_ptr 进行复制的尝试都会导致编译错误。</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="built_in">unique_ptr</span>&lt;T&gt; <span class="title">myPtr</span><span class="params">(<span class="keyword">new</span> T)</span></span>;       <span class="comment">// Ok</span></span><br><span class="line"><span class="built_in">unique_ptr</span>&lt;T&gt; myOtherPtr = myPtr; <span class="comment">// Error: Can&#x27;t copy unique_ptr</span></span><br></pre></td></tr></table></figure>
+<p>但是，unique_ptr 可以用移动</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="built_in">unique_ptr</span>&lt;T&gt; <span class="title">myPtr</span><span class="params">(<span class="keyword">new</span> T)</span></span>;                 <span class="comment">// Ok</span></span><br><span class="line"><span class="built_in">unique_ptr</span>&lt;T&gt; myOtherPtr = <span class="built_in">std</span>::move(myPtr); <span class="comment">// Ok, 资源现在储存在myOtherPtr</span></span><br></pre></td></tr></table></figure>
+<p>同样也可以执行以下操作</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="built_in">unique_ptr</span>&lt;T&gt; <span class="title">MyFunction</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    <span class="function"><span class="built_in">unique_ptr</span>&lt;T&gt; <span class="title">myPt</span><span class="params">(<span class="comment">/* ... */</span>)</span></span>;</span><br><span class="line">    <span class="comment">/* ... */</span></span><br><span class="line">    <span class="keyword">return</span> myPtr;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>上边用法的意思是：我将一个管理资源返回给你，如果你没有明确捕获返回值（ptr=MyFunction())，资源会被清理。如果捕获了返回值，那么你现在拥有资源的独占所有权。这样就可以把 unique_ptr 视为更安全更好的 auto_ptr 的替代品。</p>
+<ul>
+<li><p>unique_ptr 默认的资源析构采用 delete 运算符来实现，但可以指定自定义析构器。有状态的的删除器和采用函数指针实现的删除器会增加 std::unique_ptr 型别的对象尺寸</p>
+</li>
+<li><p>将 std::unique_ptr 转换成 std::shared_ptr 是容易实现的</p>
+</li>
+</ul>
+<p>将 std::unique_ptr 类别的对象转换为 std::shared_ptr 类别</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">std</span>::<span class="built_in">shared_ptr</span>&lt;Investment&gt; sp = makeInvestment(argument);</span><br></pre></td></tr></table></figure>
+<p>这一特性使得 unique_ptr 非常适合作为工厂函数的返回类型。工厂函数并不知道调用者对返回的对象采取专属所有权好还是共享所有权更合适，所以通过返回一个 unique_ptr 向调用者提供了更高效的智能指针，同时调用者也可将返回值转换成其他类型的智能指针(shared_ptr)。</p>
+<ul>
+<li>std::shared_ptr 提供方便的手段，实现了任意资源在共享所有权语义下进行生命周期管理的垃圾回收</li>
+</ul>
+<p>shared_ptr 允许多个指针指向给定资源。其通过访问某资源的引用计数来确定是否自己是最后一个指涉到该资源的，引用计数用来记录指涉到该资源的 shared_ptr 数量，当最后一个指向资源的 shared_ptr 被销毁时该资源将被释放。</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="built_in">shared_ptr</span>&lt;T&gt; <span class="title">myPtr</span><span class="params">(<span class="keyword">new</span> T)</span></span>; <span class="comment">// Ok</span></span><br><span class="line"><span class="built_in">shared_ptr</span>&lt;T&gt; myOtherPtr = myPtr <span class="comment">// Ok，现在有两个知怎指向资源</span></span><br></pre></td></tr></table></figure>
+
+<ul>
+<li>与 std::unique_ptr 相比，std::shared_ptr 的尺寸通常是裸指针尺寸的两倍，它还会带来控制块的开销，并要求原子化的引用计数操作</li>
+</ul>
+<p>引用计数带来的一些性能影响：</p>
+<ol>
+<li>shared_ptr 的尺寸是裸指针的两倍。因为内部包含一个指向资源的裸指针和一个指向引用计数的裸指针。 </li>
+<li>引用计数的内存必须动态分配</li>
+<li>引用计数的递增和递减必须是原子操作。当多线程运行时需要原子操作。</li>
+</ol>
+<h3 id="16：成对使用-new-和-delete-时要采取相同形式"><a href="#16：成对使用-new-和-delete-时要采取相同形式" class="headerlink" title="16：成对使用 new 和 delete 时要采取相同形式"></a>16：成对使用 new 和 delete 时要采取相同形式</h3><ul>
+<li>如果你在 new 表达式中使用[]，必须在相应的 delete 表达式中也使用[]。如果你在 new 表达式中不使用[]，一定不要在相应的 delete 表达式中使用[]。</li>
+</ul>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">std</span>::<span class="built_in">string</span>* stringPtr1 = <span class="keyword">new</span> <span class="built_in">std</span>::<span class="built_in">string</span>;</span><br><span class="line"><span class="built_in">std</span>::<span class="built_in">string</span>* stringPtr2 = <span class="keyword">new</span> <span class="built_in">std</span>::<span class="built_in">string</span>[<span class="number">100</span>];</span><br><span class="line"></span><br><span class="line"><span class="keyword">delete</span> stringPtr1;    <span class="comment">// 删除一个对象</span></span><br><span class="line"><span class="keyword">delete</span>[] stringPtr2; <span class="comment">// 删除一个由对象组成的数组</span></span><br></pre></td></tr></table></figure>
+<p>如果对 stringPtr1 使用 delete[] 操作，delete 会读取若干内存并将它解释为“数组大小”，然后开始多次调用析构函数，那无疑会带来灾难性的后果。<br>如果没有对 stringPtr2 使用 delete[] 操作，则会只删除数组中的第一个对象的析构函数，造成内存泄露。</p>
+<h3 id="17：优先使用-std-make-unique-和-std-make-shared，而非直接使用-new"><a href="#17：优先使用-std-make-unique-和-std-make-shared，而非直接使用-new" class="headerlink" title="17：优先使用 std::make_unique 和 std::make_shared，而非直接使用 new"></a>17：优先使用 std::make_unique 和 std::make_shared，而非直接使用 new</h3><blockquote>
+<p>《effective modern c++》条款21</p>
+</blockquote>
+<p>原条款；以独立语句将 newed 对象置入智能指针。</p>
+<ul>
+<li>相比于直接使用 new 表达式，make 系列函数消除了重复代码、改进了异常安全性，并且对于 std::make_shared 和 std::allcoated_shared 而言，生成的目标代码会尺寸更小、速度更快。</li>
+</ul>
+<p>std::make_unique 和 std::make_shared 是三个 make 系列函数中的两个。make 系列函数会把一个任意实参集合完美转发给动态分配内存的对象的构造函数，并返回一个指涉到该对象的智能指针。需要注意的是 make_unique 出现在 c++14。</p>
+<p>优先选用 make 系列函数的第一个原因：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">auto</span> foo = <span class="built_in">std</span>::make_shared&lt;Widget&gt;();</span><br><span class="line"><span class="function"><span class="built_in">std</span>::<span class="built_in">shared_ptr</span>&lt;Widget&gt; <span class="title">foo2</span> <span class="params">(<span class="keyword">new</span> Widget)</span></span>;</span><br></pre></td></tr></table></figure>
+<p>使用了 new 版本的将 int 重复写了两遍，而 make 函数则没有。</p>
+<p>优先使用 make 系列函数的第二个原因与异常安全有关。<br>考虑以下的代码</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">processWidget(<span class="built_in">std</span>::<span class="built_in">shared_ptr</span>&lt;Widget&gt;(<span class="keyword">new</span> Widget), computePriority());</span><br></pre></td></tr></table></figure>
+<p>在 processWidget 执行前，下列事件必须发生：</p>
+<ul>
+<li>new Widget，一个 Widget 对象必须在堆上创建</li>
+<li>由 new 产生的裸指针的托管对象 std::shared_ptr<Widget> 的构造函数必须执行</li>
+<li>computePriority 必须运行</li>
+</ul>
+<p>但是编译器不一定按照上述顺序执行代码，如果 computePriority 的运行发生在 new 和 std::shared_ptr 之间。那么第一步动态分配的 Widget 的内存将不会存储到智能指针中，也就发生了泄漏。归根结底其原因还是 std::shared_ptr<Widget>(new Widget) 会分成两步走，而两步之间发生了异常就会内存泄漏，而反观 make_shared 是一步，就不会出现上述的问题。</p>
+<p>mae_shared 的另一个优势是性能的提升。以上边的 Widget 举例，使用 new 会引发<strong>两次</strong>内存分配，因为除了要为 Widget 进行一次内存分配，还要为 shared_ptr 相关联的控制块再进行一次内存分配。而使用 make_shared <strong>一次</strong>内存分配就够了，make_shared 会分配单块内存既保存 Widget 对象又保存其相关联的控制块。</p>
+<ul>
+<li>不适于使用 make 系列函数的场景包括需要定制删除器，以及期望直接传递大括号初始化物。</li>
+<li>对于 std::shared_ptr，不建议使用 make 系列函数的额外场景包括：(1)自定义内存管理的类；(2)内存紧张的系统、非常大的对象、以及存在比指涉到相同对象的 std::shared_ptr 生存期更久的 std::weak_ptr。</li>
+</ul>
+</div></article></div></main><footer><div class="paginator"><a href="/2021/07/03/effective_cpp_note_1_and_2/" class="next">NEXT</a></div><div class="copyright"><p>© 2015 - 2021 <a href="http://woodpile27.cn">John Doe</a>, powered by <a href="https://hexo.io/" target="_blank">Hexo</a> and <a href="https://github.com/pinggod/hexo-theme-apollo" target="_blank">hexo-theme-apollo</a>.</p></div></footer></div><script async src="//cdn.bootcss.com/mathjax/2.7.0/MathJax.js?config=TeX-MML-AM_CHTML" integrity="sha384-crwIf/BuaWM9rM65iM+dWFldgQ1Un8jWZMuh3puxb8TOY9+linwLoI7ZHZT+aekW" crossorigin="anonymous"></script></body></html>
