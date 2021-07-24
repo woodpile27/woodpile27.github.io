@@ -6,7 +6,7 @@
   <link href="http://woodpile27.cn/atom.xml" rel="self"/>
   
   <link href="http://woodpile27.cn/"/>
-  <updated>2021-07-11T08:42:16.831Z</updated>
+  <updated>2021-07-24T09:30:53.497Z</updated>
   <id>http://woodpile27.cn/</id>
   
   <author>
@@ -15,6 +15,26 @@
   </author>
   
   <generator uri="https://hexo.io/">Hexo</generator>
+  
+  <entry>
+    <title>c++：effective c++ 笔记第四章</title>
+    <link href="http://woodpile27.cn/2021/07/18/effective_cpp_note_4/"/>
+    <id>http://woodpile27.cn/2021/07/18/effective_cpp_note_4/</id>
+    <published>2021-07-18T00:00:00.000Z</published>
+    <updated>2021-07-24T09:30:53.497Z</updated>
+    
+    <content type="html"><![CDATA[<h3 id="19：设计-class-犹如设计-type"><a href="#19：设计-class-犹如设计-type" class="headerlink" title="19：设计 class 犹如设计 type"></a>19：设计 class 犹如设计 type</h3><p> 在面向对象的语言中，定义一个新的 class 也就定义了一个新 type。在设计 class 时需要考虑以下细节：</p><ul><li><p><strong>对象应该如何创建和销毁</strong>。包括构造、析构函数、new、new[]、delete、delete[]的设计</p></li><li><p><strong>对象的构造函数和赋值操作符的行为</strong>应该有什么差别。构造函数和 = 的区别</p></li><li><p><strong>对象被拷贝时会发生什么</strong>。拷贝构造函数如何实现</p></li><li><p><strong>什么是新类型的合法值</strong>。考虑成员函数必须进行的错误检查工作。</p></li><li><p><strong>新类型是否需要配合某个继承体系</strong>。无论是继承别的 class，还是允许其他 class 继承该 class，都需要考虑虚函数的影响。</p></li><li><p><strong>新类型和其他类型的隐式转换</strong>。类型函数函数和 non-explict 函数的选择。</p></li><li><p><strong>新类型需不需要重载操作符</strong>。</p></li><li><p><strong>成员函数应被设置成 public 还是 private</strong>。</p></li><li><p><strong>什么是新类型的 undeclared interface</strong>。考虑新类型的效率、异常安全性、线程安全和内存安全等。</p></li><li><p><strong>是否需要 class template</strong>。</p><h3 id="20：宁以-pass-by-reference-const-替换-pass-by-value"><a href="#20：宁以-pass-by-reference-const-替换-pass-by-value" class="headerlink" title="20：宁以 pass-by-reference-const 替换 pass-by-value"></a>20：宁以 pass-by-reference-const 替换 pass-by-value</h3></li><li><p>尽量以 pass-by-reference-to-const 替换 pass-by-value。前者通常比较高效，并可避免切割问题。</p></li><li><p>以上规则并不适用于内置类型，以及 STL 的迭代器和函数对象。对它们而言，pass-by-value 往往比较适当。</p></li></ul><p>绝大多数情况下应该使用 const 引用的方式传参数，而不应该使用按值传参，主要有两个原因：</p><ol><li>按值传参传给函数的是对象的复本，传递引用则是以指针的方式实现。复本是是由对象的拷贝构造函数构造产生的，其成本远远大于传引用时使用的指针。而对于某些类型的传值，可能会涉及到关于其本身及内置数据的多次构造和析构，拷贝成本更大。</li><li>传引用可以在涉及多态时避免对象切割问题。如果一个函数接受的是父类<strong>值传递</strong>，传递子类时只会拷贝父类拥有的数据，传引用就不会发生这种问题</li></ol><p>对象小并不意味着拷贝构造函数的成本低。编译器的不同会导致类型的不同处理方式，也就是在不同编译器上会造成不同的大小。作为一个用户自定义类型，其大小也容易有所变化。</p><h3 id="21：必须返回对象时，别妄想返回其-reference"><a href="#21：必须返回对象时，别妄想返回其-reference" class="headerlink" title="21：必须返回对象时，别妄想返回其 reference"></a>21：必须返回对象时，别妄想返回其 reference</h3><ul><li>绝不要返回 pointer 或 reference 指向一个 local stack 对象，或返回 reference 指向一个 heap-allocated 对象，或返回 pointer 或 reference 指向一个 local static 对象。</li></ul><p>如果必须按值返回就按值返回，多拷贝一次也无所谓。</p><h3 id="22：将成员变量声明为-private"><a href="#22：将成员变量声明为-private" class="headerlink" title="22：将成员变量声明为 private"></a>22：将成员变量声明为 private</h3><ul><li>切记将成员变量声明为 private。private 最重要的是它提供了<strong>封装</strong>。</li><li>protected 并不比 public 更具封装性。</li></ul><p>private 提供了语法一致性：如果成员变量都是 private，那么 public 接口的每个东西都是函数，客户也不用区分变量和函数，因为每个东西都是函数。另外使用函数可以对成员变量的处理有更精确的控制，比如设置读写权限。</p><p>将成员变量封装在函数接口的后面，可以起到隐藏的作用，这意味着 class 内部的改动或升级对客户不可见，也不会产生影响，那么就可以尽量减小因类型内部改变造成的用户代码的改动。</p><p>假如我们有一个 public 成员变量但我们最终取消了它，那么所有使用它的用户代码都需要重写，因此 public 完全没有封装性。最理想的情况应该是只改用 class 内部的代码并重新编译。在这一点上 protected 和 public 一样缺乏封装性，它们都会破坏用户写的代码。</p><h3 id="23：宁以-non-member、non-friend-替换-member-函数"><a href="#23：宁以-non-member、non-friend-替换-member-函数" class="headerlink" title="23：宁以 non-member、non-friend 替换 member 函数"></a>23：宁以 non-member、non-friend 替换 member 函数</h3><ul><li>宁可拿 non-member non-friend 函数替换 member 函数。这样做可以增加封装性、包裹弹性和机能扩充性。</li></ul><p>想象一个浏览器类，有三个清理功能的函数，它们直接操作内部数据。还有一个函数 clearEverything 调用三个函数来执行所有清理动作，但是它不需要操作内部数据。</p><figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">WebBrowser</span> &#123;</span>            <span class="comment">// 一个表示网络浏览器的类</span></span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="function"><span class="keyword">void</span> <span class="title">clearCache</span><span class="params">()</span></span>;        <span class="comment">// 清理缓存</span></span><br><span class="line">    <span class="function"><span class="keyword">void</span> <span class="title">clearHistory</span><span class="params">()</span></span>;      <span class="comment">// 清理历史记录</span></span><br><span class="line">    <span class="function"><span class="keyword">void</span> <span class="title">removeCookies</span><span class="params">()</span></span>;     <span class="comment">// 清理cookies</span></span><br><span class="line">    </span><br><span class="line">    <span class="function"><span class="keyword">void</span> <span class="title">clearEverything</span><span class="params">()</span></span>;   <span class="comment">// 调用上边三个函数 </span></span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure><p>上边的实现看起来没有任何问题，但其实并不是最好的选择，更高的选择是将 clearEverything 作为一个 non-member 函数。</p><figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">clearBrowser</span><span class="params">(WebBrowser&amp; wb)</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">    wb.clearCache();</span><br><span class="line">    wb.clearHistory();</span><br><span class="line">    wb.clearCookies();</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure><p>主要有两个原因：non-member 函数提供了更好的封装性。同时也提供了更大的包裹弹性，从而拥有较低的编译依存性。</p><p>封装使我们能够改变类内的实现而只影响有限的用户。对于某一块数据的封装性有一个粗糙的判断方法：越多函数能够访问它，数据的封装性就越低。<br>上边两个 clear 函数都提供了相同的功能，但是 memer 函数可以访问 class 内的 private 数据、private 函数、enums等等，non-member 函数则不能访问上述的任何东西，那么 non-member 函数的封装性更好，因为它并不增加“能够访问 class 的 private数据”的函数数量。</p><p>需要注意的是这里讨论的 non-member 函数是不需要访问私有数据的函数，需要访问 private 数据的函数当然还是写成成员函数。</p>]]></content>
+    
+    
+      
+      
+    <summary type="html">&lt;h3 id=&quot;19：设计-class-犹如设计-type&quot;&gt;&lt;a href=&quot;#19：设计-class-犹如设计-type&quot; class=&quot;headerlink&quot; title=&quot;19：设计 class 犹如设计 type&quot;&gt;&lt;/a&gt;19：设计 class 犹如设计 type&lt;/</summary>
+      
+    
+    
+    
+    
+  </entry>
   
   <entry>
     <title>c++：effective c++ 笔记第三章</title>
