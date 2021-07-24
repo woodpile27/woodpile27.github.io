@@ -6,7 +6,7 @@
   <link href="http://woodpile27.cn/atom.xml" rel="self"/>
   
   <link href="http://woodpile27.cn/"/>
-  <updated>2021-07-24T09:30:53.497Z</updated>
+  <updated>2021-07-24T11:49:44.177Z</updated>
   <id>http://woodpile27.cn/</id>
   
   <author>
@@ -15,6 +15,26 @@
   </author>
   
   <generator uri="https://hexo.io/">Hexo</generator>
+  
+  <entry>
+    <title>一个 Phorpiex 家族变种样本分析</title>
+    <link href="http://woodpile27.cn/2021/07/23/a-easy-phorpiex-variant-sample/"/>
+    <id>http://woodpile27.cn/2021/07/23/a-easy-phorpiex-variant-sample/</id>
+    <published>2021-07-23T00:00:00.000Z</published>
+    <updated>2021-07-24T11:49:44.177Z</updated>
+    
+    <content type="html"><![CDATA[<p><a href="https://www.virustotal.com/gui/file/abf63fc54948cdd9d1bf46a2f59fcb081bb0ff10b595f0ba2faad392ad368922/detection">vt</a> 引擎识别出是 Phorpiex 家族。样本比较简单，比较适合我这种入门选手🤦‍♂️。。</p><h3 id="原始样本分析"><a href="#原始样本分析" class="headerlink" title="原始样本分析"></a>原始样本分析</h3><p>由于原始样本文件没有加壳，大致搂了一眼发现样本请求的 uri 直接能在样本中找到：</p><p><img src="http://xhisall.gitee.io/image/image/Phorpiex1.png"></p><p>从 WinMain 函数进入后，发现其先后调用了 get_ip_location 和 get_locale_info 判断是否在乌克兰。get_ip_location 请求 <a href="http://api.wipmania.com/">http://api.wipmania.com/</a> 获取 ip 的国家代号判断是否是乌克兰的代号 UA ，get_locale_info 调用 GetLocaleInfoA API 获取用户默认的语言环境是否是乌克兰语 UKR。如果是乌克兰则退出程序。</p><p><img src="http://xhisall.gitee.io/image/image/Phorpiex2.png"></p><p><img src="http://xhisall.gitee.io/image/image/Phorpiex3.png"></p><p>接着执行一大堆 FindWindowA API 的无意义代码后，调用 CreateDirectoryW API 在 C 盘创建一个随机数名称的新文件夹，再调用 CopyFIileW 将当前文件拷贝到新文件夹中的 lsass.exe 。 调用 PathFindFileNameW API 获取自身的文件名与 lsass.exe 比较，如果不相同又会进入一段 FindWindowA 的混淆代码。</p><p>接着修改注册表以达到持久化的目的，最后执行 run_lsass 运行先前拷贝的 lsass.exe，也就是再次执行它自身。最后退出。<br><img src="http://xhisall.gitee.io/image/image/Phorpiex4.png"></p><h3 id="lsass-exe"><a href="#lsass-exe" class="headerlink" title="lsass.exe"></a>lsass.exe</h3><p>lsass.exe 其实就是之前的样本，在把自身文件名跟 lsass.exe 比较之前和上述的行为一样，只不过这次比较的结果相同，进入了一个不同的逻辑。</p><p>首先对注册表进行了一些操作，调用 decode_reg 解密出几个键并尝试设置，分别是 <code>SOFTWARE\Policies\Microsoft\Windows Defender</code>，<code>SOFTWARE\Microsoft\Security Center</code>，<code>SOFTWARE\Microsoft\Security Center\Svc</code>。</p><p>接着创建了三个线程，分别用来篡改剪贴板（sub_40FC50）、感染可移动媒体和远程网络驱动器（sub_410F70）、和 tor 网络通信（sub_4112D0）。</p><p><img src="http://xhisall.gitee.io/image/image/Phorpiex5.png"></p><h4 id="tamper-Clipboard"><a href="#tamper-Clipboard" class="headerlink" title="tamper_Clipboard"></a>tamper_Clipboard</h4><p>该线程用来监听剪贴板的内容，如果发现剪贴板上有数字货币钱包的信息，就把钱包地址替换成样本内置的首字母相同的地址。</p><p>tamper_Clipboard 函数不断读取剪贴板的内容，读到内容后就调用 relpace_wallet 函数。</p><p><img src="http://xhisall.gitee.io/image/image/Phorpiex6.png"></p><p>relpace_wallet 判断内容是否是钱包地址，如果发现是钱包地址，就把剪贴板清空并写入样本内置的相同首字母的钱包地址。</p><p><img src="http://xhisall.gitee.io/image/image/Phorpiex7.png"></p><h4 id="infect-RemovableMedia-and-RemoteDrive"><a href="#infect-RemovableMedia-and-RemoteDrive" class="headerlink" title="infect_RemovableMedia_and_RemoteDrive"></a>infect_RemovableMedia_and_RemoteDrive</h4><p>该线程用来寻找主机上的可移动媒体和远程网络驱动器并感染它们。</p><p>infect_RemovableMedia_and_RemoteDrive 函数首先调用 get_available_LogicalDrives，通过 GetLogicalDrives 和读取注册表中隐藏的磁盘信息来获得该主机可用的磁盘驱动器信息，在我的虚拟机中它返回的是 0b11100，代表 C 盘、D 盘和 E 盘。<br>接着调用 check_and_get_driveType 检查磁盘驱动的信息，发现设备是可移动媒体或者远程网络驱动器就对该磁盘调用 infect_drive 以感染它。</p><p><img src="http://xhisall.gitee.io/image/image/Phorpiex8.png"></p><p>infect_drive 将文件本身复制到磁盘的 __\DriveMgr.exe，再调用 cmd.exe 运行它以达到感染的目的。</p><p><img src="http://xhisall.gitee.io/image/image/Phorpiex9.png"><br><img src="http://xhisall.gitee.io/image/image/Phorpiex10.png"></p><h4 id="communicate-with-onion"><a href="#communicate-with-onion" class="headerlink" title="communicate_with_onion"></a>communicate_with_onion</h4><p>该线程的主要功能是在本地创建一个代理，并通过代理向</p><p>在请求 onion 请求之前，其首先使用完成端口的模式在本地创建了一个 HTTP 代理。<br>创建过程：</p><ol><li>调用 CreateIoCompletionPort 创建一个完成端口，并将它的句柄保存起来，接下来会经常使用它。这里保存在了 <code>(this + 8409496)</code><br> <img src="http://xhisall.gitee.io/image/image/Phorpiex11.png"> <br></li><li>创建一个 tcp socket，监听 127.0.0.1 的一个随机端口，将 socket addr 保存起来，在代理建立完成后使用代理向 onion 发起请求。<br> <img src="http://xhisall.gitee.io/image/image/Phorpiex12.png"> <br></li><li>开启16个工作线程，工作线程的作用是和客户端通信。<br> <img src="http://xhisall.gitee.io/image/image/Phorpiex13.png"> <br></li><li>开启一个线程用来处理 socket 收到的请求。该线程调用 WSAAccept 接受请求，当有新连接时，调用 CreateIoCompletionPort 将新连接的 socket 与先前建立的完成端口绑定起来。对新连接调用 WSARecv，接受其发送的数据，数据会通过完成端口交给工作线程处理。<br><img src="http://xhisall.gitee.io/image/image/Phorpiex15.png"><br></li><li>工作线程调用 GetQueuedCompletionStatus 扫描完成端口的队列里是否存在请求，如果有就把请求从完成端口的队列中取出，继续执行线程后边的代码。<br> <img src="http://xhisall.gitee.io/image/image/Phorpiex16.png"> <br></li></ol><p>接下来开始向内置的 7fv5nq57k4qvbrpt.onion 发起请求，其依次向域名下的 tt11、tt22、tt33、tt44、tt55、tt66 发起请求。<br><img src="http://xhisall.gitee.io/image/image/Phorpiex17.png"><br><br><br>如果本地的 HTTP 代理建立成功，就使用 InternetOpenA 的代理模式并为其指定代理地址。<br><img src="http://xhisall.gitee.io/image/image/Phorpiex18.png"><br><br><br>如果成功在连接中读取到内容，就将其保存到临时目录，使用程序自带的密钥解密后运行。<br><img src="http://xhisall.gitee.io/image/image/Phorpiex19.png"><br><br><br>在请求 tt11 时没有发现接收到有效的 payload。</p><h4 id="WinMain-的最后"><a href="#WinMain-的最后" class="headerlink" title="WinMain 的最后"></a>WinMain 的最后</h4><p>在 WinMain 的最后，程序不断请求以下域名和路径的组合<br><img src="http://xhisall.gitee.io/image/image/Phorpiex20.png"><br><br><br>如果请求返回的资源大小大于7000，跟上边的行为类似，同样会把 payload 下载到本地，写入文件，解密后运行。但是没有发现其有下载 payload 的行为。<br><img src="http://xhisall.gitee.io/image/image/Phorpiex21.png"></p><h3 id="Reference"><a href="#Reference" class="headerlink" title="Reference"></a>Reference</h3><p><a href="https://v2.s.tencent.com/research/report/1316.html">https://v2.s.tencent.com/research/report/1316.html</a></p>]]></content>
+    
+    
+      
+      
+    <summary type="html">&lt;p&gt;&lt;a href=&quot;https://www.virustotal.com/gui/file/abf63fc54948cdd9d1bf46a2f59fcb081bb0ff10b595f0ba2faad392ad368922/detection&quot;&gt;vt&lt;/a&gt; 引擎识别出是 Ph</summary>
+      
+    
+    
+    
+    
+  </entry>
   
   <entry>
     <title>c++：effective c++ 笔记第四章</title>
